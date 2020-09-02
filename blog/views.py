@@ -78,7 +78,7 @@ def logout_view(request):
 
 
 def my_posts(request):
-    posts = request.user.profile.post_set.all()
+    posts = request.user.profile.blog_posts.all()
     return render(request, 'posts.html', {'posts': posts})
 
 
@@ -86,7 +86,6 @@ def edit_post(request, pk):
     if request.method == 'POST':
         post = Post.objects.get(id=pk)
         form = PostForm(request.POST, instance=post)
-        print(form)
         if form.is_valid():
             instance = form.save(commit=False)
             instance.author = request.user.profile
