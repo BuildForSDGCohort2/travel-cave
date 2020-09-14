@@ -1,3 +1,4 @@
 # travel-cave
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/f69fcd1b22c246daab329c633a365692)](https://app.codacy.com/gh/BuildForSDGCohort2/travel-cave?utm_source=github.com&utm_medium=referral&utm_content=BuildForSDGCohort2/travel-cave&utm_campaign=Badge_Grade_Dashboard)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/e39e739f755948959201d367c7164a0d)](https://app.codacy.com/manual/elizabethadegbaju/travel-cave?utm_source=github.com&utm_medium=referral&utm_content=elizabethadegbaju/travel-cave&utm_campaign=Badge_Grade_Dashboard)
