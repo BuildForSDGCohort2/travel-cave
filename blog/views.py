@@ -1,14 +1,20 @@
+from itertools import chain
+from operator import attrgetter
+
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
+from django.utils.dateparse import parse_datetime
 from google.cloud import language
 from google.cloud.language import enums
 from google.cloud.language import types
 
 from blog.forms import PostForm
-from blog.models import Profile, Post, Location, LocationReview, Tag
+from blog.models import Profile, Post, Location, LocationReview, Tag, \
+    PostLike, Comment
 
 
 def login_view(request):
@@ -17,7 +23,9 @@ def login_view(request):
         password = request.POST['password']
         user = authenticate(request, username=username, password=password)
         if user is not None:
+            last_login = user.last_login
             login(request, user)
+            request.session['previous_login'] = last_login.isoformat()
             return redirect('blog:home')
         else:
             # Return an 'invalid login' error message.
@@ -163,3 +171,61 @@ def delete_post(request, pk):
     post = Post.objects.get(id=pk)
     post.delete()
     return redirect('blog:my_posts')
+
+
+def view_user(request, username):
+    profile = Profile.objects.get(user__username=username)
+    activities = get_user_activities_sorted(username)
+    newsfeed = get_newsfeed_sorted(profile.users_following.all())
+    blog_posts = Post.objects.filter(author=profile)
+    reviews = LocationReview.objects.filter(post__in=blog_posts)
+    highlight = Post.objects.filter(is_published=True).order_by('-created_at',
+                                                                '-total_likes',
+                                                                '-total_comments',
+                                                                '-total_shares').first()
+    # recommend users who follow the same content
+    recommended_users = (Profile.objects.filter(
+        users_following__in=profile.users_following.all()) | Profile.objects.filter(
+        locations_following__in=profile.locations_following.all())).order_by(
+        '?')[:5]
+    previous_login = parse_datetime(request.session['previous_login'])
+    updates = LocationReview.objects.filter(
+        location__in=profile.locations_following.all(),
+        post__is_published=True,
+        post__created_at__gt=previous_login).values('location').annotate(
+        total=Count('location')).order_by('total')
+    return render(request, 'user.html',
+                  {'profile': profile, 'activities': activities,
+                   'reviews': reviews, 'highlight': highlight,
+                   'recommended_users': recommended_users, 'updates':
+                       updates, 'newsfeed': newsfeed})
+
+
+def get_user_activities_sorted(username):
+    user = Profile.objects.get(user__username=username)
+    likes = PostLike.objects.filter(user=user)
+    comments = Comment.objects.filter(user=user)
+    posts = Post.objects.filter(author=user)
+    result_list = sorted(chain(likes, comments, posts),
+                         key=attrgetter('created_at'), reverse=True)
+    return result_list
+
+
+def get_newsfeed_sorted(users_following):
+    likes = PostLike.objects.filter(user__in=users_following)
+    comments = Comment.objects.filter(user__in=users_following)
+    posts = Post.objects.filter(author__in=users_following)
+    result_list = sorted(chain(likes, comments, posts),
+                         key=attrgetter('created_at'), reverse=True)
+    return result_list
+
+
+def follow_user(request, username):
+    profile = Profile.objects.get(user__username=username)
+    user = request.user
+    user.profile.users_following.add(profile)
+    return redirect('blog:view_user', username)
+
+
+def users(request):
+    return None
