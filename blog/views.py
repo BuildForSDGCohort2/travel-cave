@@ -8,6 +8,7 @@ from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.utils.dateparse import parse_datetime
+from django.utils.timezone import now
 from google.cloud import language
 from google.cloud.language import enums
 from google.cloud.language import types
@@ -25,7 +26,8 @@ def login_view(request):
         if user is not None:
             last_login = user.last_login
             login(request, user)
-            request.session['previous_login'] = last_login.isoformat()
+            if last_login is not None:
+                request.session['previous_login'] = last_login.isoformat()
             return redirect('blog:home')
         else:
             # Return an 'invalid login' error message.
@@ -39,7 +41,10 @@ def index(request):
 
 
 def view_post(request, pk):
-    return render(request, '')
+    post = Post.objects.get(id=pk)
+    profile = post.author
+    return render(request, 'view_post.html',
+                  {'post': post, 'profile': profile})
 
 
 @login_required
@@ -71,6 +76,7 @@ def register(request):
         password = request.POST['password']
         dob = request.POST['dob']
         username = request.POST['username']
+        image = request.FILES['image']
 
         user = User.objects.create_user(username=username, email=email,
                                         password=password,
@@ -78,7 +84,7 @@ def register(request):
                                         last_name=last_name)
         user.save()
 
-        user_profile = Profile.objects.create(DOB=dob, user=user)
+        user_profile = Profile.objects.create(DOB=dob, user=user, image=image)
         user_profile.save()
 
         return redirect('blog:home')
@@ -176,7 +182,8 @@ def delete_post(request, pk):
 def view_user(request, username):
     profile = Profile.objects.get(user__username=username)
     activities = get_user_activities_sorted(username)
-    newsfeed = get_newsfeed_sorted(profile.users_following.all())
+    newsfeed = get_newsfeed_sorted(
+        profile.users_following.all()) if request.user.username == username else []
     blog_posts = Post.objects.filter(author=profile)
     reviews = LocationReview.objects.filter(post__in=blog_posts)
     highlight = Post.objects.filter(is_published=True).order_by('-created_at',
@@ -186,9 +193,10 @@ def view_user(request, username):
     # recommend users who follow the same content
     recommended_users = (Profile.objects.filter(
         users_following__in=profile.users_following.all()) | Profile.objects.filter(
-        locations_following__in=profile.locations_following.all())).order_by(
-        '?')[:5]
-    previous_login = parse_datetime(request.session['previous_login'])
+        locations_following__in=profile.locations_following.all())).exclude(
+        user=request.user).order_by('?')[:5]
+    previous_login = parse_datetime(
+        request.session.get('previous_login', now().isoformat()))
     updates = LocationReview.objects.filter(
         location__in=profile.locations_following.all(),
         post__is_published=True,
@@ -227,5 +235,26 @@ def follow_user(request, username):
     return redirect('blog:view_user', username)
 
 
+def unfollow_user(request, username):
+    profile = Profile.objects.get(user__username=username)
+    user = request.user
+    user.profile.users_following.remove(profile)
+    return redirect('blog:view_user', username)
+
+
 def users(request):
     return None
+
+
+def view_location(request, pk):
+    location = Location.objects.get(id=pk)
+    reviews = LocationReview.objects.filter(location=location)
+    return render(request, 'location.html',
+                  {'location': location, 'reviews': reviews})
+
+
+def view_tag(request, pk):
+    tag = Tag.objects.get(id=pk)
+    posts = tag.blog_posts.all()
+    return render(request, 'tag.html',
+                  {'tag': tag, 'posts': posts})

@@ -32,6 +32,10 @@ urlpatterns = [
     path('account/posts/', views.my_posts, name='my_posts'),
     path('users/<str:username>/follow/', views.follow_user,
          name='follow_user'),
+    path('users/<str:username>/unfollow/', views.unfollow_user,
+         name='unfollow_user'),
     path('users/<str:username>/', views.view_user, name='view_user'),
     path('users/', views.users, name='users'),
+    path('locations/<int:pk>/', views.view_location, name='view_location'),
+    path('tags/<int:pk>/', views.view_tag, name='view_tag')
 ]
