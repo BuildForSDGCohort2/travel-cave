@@ -1,7 +1,7 @@
 {% extends 'base_nav.html' %}
 {% block nav %}
     <nav class="nav-extended">
-        <div class="nav-wrapper">
+        <div class="nav-wrapper pl-1">
             <a href="#" class="brand-logo">Travel Cave</a>
             <a href="#" data-target="mobile-demo" class="sidenav-trigger"><i
                     class="material-icons">menu</i></a>
@@ -23,6 +23,7 @@
         </div>
         <div class="nav-content">
             <div class="pb-0 pt-4">
+                {% block intro %}
                 <nav>
                     <div class="nav-wrapper">
                         <div class="col s12">
@@ -33,6 +34,7 @@
                         </div>
                     </div>
                 </nav>
+                {% endblock %}
             </div>
         </div>
     </nav>

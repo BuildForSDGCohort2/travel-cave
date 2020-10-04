@@ -1,10 +1,11 @@
+from datetime import timedelta, datetime
 from itertools import chain
 from operator import attrgetter
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db.models import Count
+from django.db.models import Count, Avg
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.utils.dateparse import parse_datetime
@@ -37,7 +38,16 @@ def login_view(request):
 
 
 def index(request):
-    return render(request, 'index.html')
+    recent_posts = Post.objects.filter(is_published=True)[:12]
+    today = datetime.now()
+    week_ago = today - timedelta(days=7)
+    trending_locations = Location.objects.filter(
+        reviews__postlike__created_at__gte=week_ago).annotate(
+        likes_count=Count('reviews__postlike', distinct=True),
+        average_sentiment=Avg('locationreview__sentiment',
+                              distinct=True)).order_by('-likes_count')[:12]
+    return render(request, 'index.html', {'recent_posts': recent_posts,
+                                          'trending_locations': trending_locations})
 
 
 def view_post(request, pk):
@@ -272,3 +282,50 @@ def view_tag(request, pk):
     posts = tag.blog_posts.all()
     return render(request, 'tag.html',
                   {'tag': tag, 'posts': posts})
+
+
+def like_post(request, pk):
+    post = Post.objects.get(id=pk)
+    post_like = PostLike.objects.create(post=post, user=request.user.profile)
+    post_like.save()
+    post.total_likes += 1
+    post.save()
+    return redirect('blog:view_post', pk)
+
+
+def unlike_post(request, pk):
+    post = Post.objects.get(id=pk)
+    post_like = PostLike.objects.get(post=post, user=request.user.profile)
+    post_like.delete()
+    post.total_likes -= 1
+    post.save()
+    return redirect('blog:view_post', pk)
+
+
+def comment_post(request, pk):
+    message = request.POST['comment']
+    post = Post.objects.get(id=pk)
+    comment = Comment.objects.create(user=request.user.profile, post=post,
+                                     message=message)
+    comment.save()
+    post.total_comments += 1
+    post.save()
+    return redirect('blog:view_post', pk)
+
+
+def share_post(request, pk):
+    post = Post.objects.get(id=pk)
+    post.total_shares += 1
+    post.save()
+    return redirect('blog:view_post', pk)
+
+
+def publish_post(request, pk):
+    post = Post.objects.get(id=pk)
+    post.is_published = True
+    post.save()
+    return redirect('blog:view_post', pk)
+
+
+def explore(request):
+    return None
